@@ -1,14 +1,21 @@
 #include "mbed.h"
 #include "EthernetNetIf.h"
 #include "MySQLClient.h"
+#include <iostream>
+#include <fstream>
+#include <string>
 
-#define SQL_SERVER   "sqlserver"
-#define SQL_USER     "user"
-#define SQL_PASSWORD "password"
-#define SQL_DB       "dbname"
+LocalFileSystem local("local");
+DigitalOut led(LED1);
+void getdbinfo(string dbserver, string dbname, string dbuser, string dbpass);
 
 EthernetNetIf eth; 
 MySQLClient sql;
+
+string dbserver;
+string dbname;
+string dbuser;
+string dbpass;
 
 MySQLResult sqlLastResult;
 void onMySQLResult(MySQLResult r)
@@ -29,10 +36,15 @@ int main()
   }
   printf("Setup OK\n");
   
-  Host host(IpAddr(), 3306, SQL_SERVER);
+  // Db config
+  printf("Get DB info from config file.\n");
+  getdbinfo(&dbserver, &dbuser, &dbpass, &dbname);
+  printf("DB info OK");
+  
+  Host host(IpAddr(), 3306, dbserver);
   
   //Connect
-  sqlLastResult = sql.open(host, SQL_USER, SQL_PASSWORD, SQL_DB, onMySQLResult);
+  sqlLastResult = sql.open(host, dbuser, dbpass, dbname, onMySQLResult);
   while(sqlLastResult == MYSQL_PROCESSING)
   {
     Net::poll();
@@ -71,3 +83,49 @@ int main()
   
   return 0;
 }
+
+void getdbinfo(string dbserver, string dbname, string dbuser, string dbpass) {
+    string line;
+    ifstream ifs("/local/db.cnf");
+    if (ifs.is_open())
+    {   
+        // Get values
+        int linenb = 1;
+        while (ifs.good())
+        {
+            getline(ifs, line);
+            switch(linenb){
+                case 1:
+                    dbserver = line;
+                    break;
+                case 2:
+                    dbuser = line;
+                    break;
+                case 3:
+                    dbpass = line;
+                    break;
+                case 4:
+                    dbname = line;
+                    break;            
+            }
+            linenb++;
+        }
+        ifs.close();
+        // Check values
+        /*
+        printf("server: %s\n", dbserver);
+        printf("user: %s\n", dbuser);
+        printf("pass: %s\n", dbpass);
+        printf("name: %s\n", dbname);
+        */
+    } else {
+        printf("file error\n");
+        while(1){
+            led = 1;
+            wait(1);
+            led = 0;
+            wait(1);
+        }
+    }
+}
+
